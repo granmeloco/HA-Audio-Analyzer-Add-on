@@ -1,6 +1,15 @@
 {
   "name": "HA Audio Analyzer Add-on",
-  "description": "Add-on to analyze sound: event-driven 1/3-octave spectra, FLAC+CSV recordings and MQTT integration.",
-  "url": "https://github.com/granmeloco/HA-Audio-Analyzer-Add-on",
-  "maintainer": "granmeloco"
+  "url": "https://github.com/granmeloco/HA-Sound-Analyzer-Add-on",
+  "maintainer": "granmeloco",
+  "addons": {
+    "wp_audio_trigger": {
+      "name": "WP Audio Trigger",
+      "slug": "wp_audio_trigger",
+      "version": "0.1.10",
+      "url": "https://github.com/granmeloco/HA-Sound-Analyzer-Add-on",
+      "directory": "hass-addon-audio-analyzer",
+      "arch": ["aarch64","armv7","armhf","amd64"]
+    }
+  }
 }
