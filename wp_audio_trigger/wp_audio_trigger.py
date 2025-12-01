@@ -158,7 +158,8 @@ def main():
         connected["ok"] = False
         print(f"[wp-audio] MQTT disconnected rc={rc}")
 
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, protocol=mqtt.MQTTv311)
+    # Use modern callback API (VERSION2) to avoid deprecation warning
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
     client.on_connect = on_connect; client.on_disconnect = on_disconnect
     client.will_set(f"{args.topic_base}/availability", payload="offline", qos=1, retain=True)
     if args.mqtt_user: client.username_pw_set(args.mqtt_user, args.mqtt_pass)
