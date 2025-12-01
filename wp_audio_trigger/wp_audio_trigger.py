@@ -132,8 +132,10 @@ def main():
 
     # MQTT
     connected = {"ok": False}
-    def on_connect(client, userdata, flags, rc, properties=None):
-        if rc == 0:
+    # paho-mqtt Callback API v2 signature: on_connect(client, userdata, flags, reason_code, properties)
+    def on_connect(client, userdata, flags, reason_code, properties=None):
+        # reason_code == 0 indicates success
+        if int(getattr(reason_code, 'value', reason_code)) == 0:
             connected["ok"] = True
             print("[wp-audio] MQTT verbunden")
             client.publish(f"{args.topic_base}/availability", "online", qos=1, retain=True)
@@ -152,11 +154,12 @@ def main():
             client.publish(f"{disc}/sensor/{dev_id}/octA_160/config", json.dumps(cfg160), qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/spectrum/config", json.dumps(cfgspec), qos=1, retain=True)
         else:
-            print(f"[wp-audio] MQTT connect failed rc={rc}")
+            print(f"[wp-audio] MQTT connect failed rc={reason_code}")
 
-    def on_disconnect(client, userdata, rc, properties=None):
+    # paho-mqtt Callback API v2 signature: on_disconnect(client, userdata, reason_code, properties)
+    def on_disconnect(client, userdata, reason_code, properties=None):
         connected["ok"] = False
-        print(f"[wp-audio] MQTT disconnected rc={rc}")
+        print(f"[wp-audio] MQTT disconnected rc={reason_code}")
 
     # Use modern callback API (VERSION2) to avoid deprecation warning
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv311)
