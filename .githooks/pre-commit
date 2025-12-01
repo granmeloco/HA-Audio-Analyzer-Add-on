@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Auto-bump version in wp_audio_trigger/config.yaml before each commit
+python "scripts/bump_version.py" || exit 0
+
+# Stage manifest if modified
+git add "wp_audio_trigger/config.yaml" || true
+
+exit 0
