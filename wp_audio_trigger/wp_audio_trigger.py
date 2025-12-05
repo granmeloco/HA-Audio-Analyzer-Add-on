@@ -56,101 +56,214 @@ latest_payload = {"bands": [], "values": [], "weighting": "Z", "ts": now_utc(), 
 trigger_config = {"triggers": []}  # Will be populated from args
 
 HTML = """<!DOCTYPE html><meta charset=utf-8>
-<title>WP Audio</title>
+<title>Audio Analyzer settings</title>
 <style>
-body{font-family:system-ui,Segoe UI,Arial;margin:16px;background:#fafbfc}
-h2{margin:0 0 8px}
-h3{margin:24px 0 12px;font-size:18px;color:#333}
-#head{display:flex;gap:16px;align-items:baseline;margin-bottom:8px}
-#vals{font-weight:600}
-#wrap{display:grid;grid-template-columns:repeat(29,1fr);gap:3px;height:40vh;align-items:end;background:#f5f7f9;padding:8px;border-radius:8px}
-.bar{background:#4aa3a2;position:relative}
-.bar::after{content:attr(data-v);position:absolute;top:-1.4em;left:0;font:11px/1.2 monospace;color:#333}
-#labels{display:grid;grid-template-columns:repeat(29,1fr);gap:3px;margin-top:6px}
-#labels div{font:11px/1.1 monospace;text-align:center;color:#555}
-small{color:#666}
-#triggers{margin-top:24px;background:white;padding:16px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
-.trig-row{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}
-.trig-row:last-child{border-bottom:none}
-.trig-row label{font-weight:500;color:#555;min-width:80px}
-.trig-row input{padding:6px 10px;border:1px solid #ddd;border-radius:4px;font:inherit}
-.trig-row button{padding:6px 16px;background:#4aa3a2;color:white;border:none;border-radius:4px;cursor:pointer;font:inherit}
-.trig-row button:hover{background:#3a8a89}
-.trig-row button:disabled{background:#ccc;cursor:not-allowed}
-#status{margin-top:8px;padding:8px;border-radius:4px;font-size:14px;display:none}
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#fff;max-width:1000px;margin:0 auto}
+h1{text-align:center;font-size:24px;margin-bottom:20px}
+.section{background:#e8e8e8;padding:12px;margin-bottom:16px;border-radius:4px}
+.section-title{font-weight:bold;margin-bottom:12px;font-size:14px}
+.row{display:flex;gap:20px;margin-bottom:10px;align-items:center}
+.radio-group{display:flex;align-items:center;gap:8px}
+.radio-group input[type=radio]{margin:0}
+.radio-group label{margin:0;font-size:13px}
+.field-label{min-width:180px;font-size:13px}
+input[type=text],input[type=number]{padding:4px 8px;border:1px solid #999;font-size:13px;width:100px}
+.freq-range{font-size:11px;color:#666;margin-left:10px}
+.trigger-row{display:grid;grid-template-columns:180px 100px 150px 100px 150px;gap:15px;align-items:center;margin-bottom:8px}
+.calib-row{display:flex;gap:15px;align-items:center;margin-bottom:8px}
+.calib-label{min-width:40px;text-align:center;font-size:12px}
+input[type=text].calib{width:60px;text-align:center}
+button{background:#4aa3a2;color:white;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:13px;margin-top:10px}
+button:hover{background:#3a8a89}
+#status{margin-top:10px;padding:8px;border-radius:4px;font-size:13px;display:none}
 #status.success{background:#d4edda;color:#155724;display:block}
 #status.error{background:#f8d7da;color:#721c24;display:block}
 </style>
-<div id=head>
-  <h2>WP Audio – Live-Spektrum & Trigger-Konfiguration</h2>
-  <div id=vals>LA80: – dB(A) · LA160: – dB(A)</div>
+<h1>Audio Analyzer settings</h1>
+
+<div class=section>
+  <div class=section-title>Spectrum analyzer settings</div>
+  <div class=row>
+    <div class=radio-group>
+      <input type=radio name=bands id=b1oct value=1octave>
+      <label for=b1oct>1-octave bands</label>
+    </div>
+    <span class=freq-range>(31.5 - 63 - 125 - 250 - 500 - 1000 - 2000 - 4000 - 8000 - 16000)</span>
+  </div>
+  <div class=row>
+    <div class=radio-group>
+      <input type=radio name=bands id=b3oct value=3octave checked>
+      <label for=b3oct>1/3-octave bands</label>
+    </div>
+    <span class=freq-range>(1 - 1.25 - 1.6 - 2 - 2.5 - 3.15 - 4 - 5 - 6.3 - 8 - 10 - 12.5 - 16 - 20 - 25 - 31.5 - 40 - 50 - 63 - 80 - 100 - 125 - 160 - 200 - 250 - 315 - 400 - 500 - 630 - 800 - 1000 - 1250 - 1600 - 2000 - 2500 - 3150 - 4000 - 5000 - 6300 - 8000 - 10000 - 12500 - 16000 - 20000 Hz)</span>
+  </div>
+  <div class=row>
+    <span class=field-label>Min. Frequency [Hz]</span>
+    <input type=number id=minFreq value=31.5 step=0.1>
+    <span class=field-label style="margin-left:20px">Max. Frequency [Hz]</span>
+    <input type=number id=maxFreq value=20000 step=0.1>
+  </div>
 </div>
-<small>Bewertung: <span id=wgt>–</span> · Zeit: <span id=ts>–</span></small>
-<div id=wrap></div>
-<div id=labels></div>
-<div id=triggers>
-  <h3>Trigger-Konfiguration</h3>
-  <div id=trig-list></div>
-  <div id=status></div>
+
+<div class=section>
+  <div class=section-title>Audio trigger settings</div>
+  <div class=trigger-row style="font-weight:bold;font-size:12px">
+    <span></span>
+    <span>Frequency [Hz]</span>
+    <span>Min. amplitude [dBA]</span>
+    <span>Min. duration [s]</span>
+  </div>
+  <div class=trigger-row>
+    <span class=field-label>1. Frequency [Hz]</span>
+    <input type=number id=t1freq placeholder="">
+    <span class=field-label>Min. amplitude [dBA]</span>
+    <input type=number id=t1amp placeholder="" step=0.1>
+    <span class=field-label>Min. duration [s]</span>
+    <input type=number id=t1dur placeholder="" step=0.1>
+  </div>
+  <div class=trigger-row>
+    <span class=field-label>2. Frequency [Hz]</span>
+    <input type=number id=t2freq placeholder="">
+    <span class=field-label>Min. amplitude [dBA]</span>
+    <input type=number id=t2amp placeholder="" step=0.1>
+    <span class=field-label>Min. duration [s]</span>
+    <input type=number id=t2dur placeholder="" step=0.1>
+  </div>
+  <div class=trigger-row>
+    <span class=field-label>3. Frequency [Hz]</span>
+    <input type=number id=t3freq placeholder="">
+    <span class=field-label>Min. amplitude [dBA]</span>
+    <input type=number id=t3amp placeholder="" step=0.1>
+    <span class=field-label>Min. duration [s]</span>
+    <input type=number id=t3dur placeholder="" step=0.1>
+  </div>
+  <div class=trigger-row>
+    <span class=field-label>4. Frequency [Hz]</span>
+    <input type=number id=t4freq placeholder="">
+    <span class=field-label>Min. amplitude [dBA]</span>
+    <input type=number id=t4amp placeholder="" step=0.1>
+    <span class=field-label>Min. duration [s]</span>
+    <input type=number id=t4dur placeholder="" step=0.1>
+  </div>
+  <div class=row>
+    <span class=field-label>Logical constraint:</span>
+    <div class=radio-group>
+      <input type=radio name=logic id=logicAnd value=AND checked>
+      <label for=logicAnd>AND</label>
+    </div>
+    <div class=radio-group>
+      <input type=radio name=logic id=logicOr value=OR>
+      <label for=logicOr>OR</label>
+    </div>
+  </div>
 </div>
+
+<div class=section>
+  <div class=section-title>Recorded sound file settings</div>
+  <div class=row>
+    <span class=field-label>Storage location</span>
+    <input type=text id=storageLocation style="width:400px" placeholder="/media/wp_audio/events">
+  </div>
+  <div class=row>
+    <span class=field-label>Recording length [s]</span>
+    <input type=number id=recLength placeholder="" step=1>
+  </div>
+</div>
+
+<div class=section>
+  <div class=section-title>Mic calibration settings</div>
+  <div class=calib-row>
+    <span class=calib-label>+/-</span>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <input type=text class=calib id=cal63 placeholder="">
+      <span style="font-size:11px;margin-top:2px">63Hz</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <input type=text class=calib id=cal250 placeholder="">
+      <span style="font-size:11px;margin-top:2px">250Hz</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <input type=text class=calib id=cal1000 placeholder="">
+      <span style="font-size:11px;margin-top:2px">1000Hz</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <input type=text class=calib id=cal4000 placeholder="">
+      <span style="font-size:11px;margin-top:2px">4000Hz</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <input type=text class=calib id=cal16000 placeholder="">
+      <span style="font-size:11px;margin-top:2px">16000Hz</span>
+    </div>
+  </div>
+</div>
+
+<button onclick="saveConfig()">Save Configuration</button>
+<div id=status></div>
+
 <script>
-const wrap=document.getElementById('wrap'), labels=document.getElementById('labels');
-const vspan=document.getElementById('vals'), wspan=document.getElementById('wgt'), tspan=document.getElementById('ts');
-const trigList=document.getElementById('trig-list'), statusDiv=document.getElementById('status');
-const es=new EventSource('sse'); let minDB=25, maxDB=100;
-let triggerData=[];
+const statusDiv=document.getElementById('status');
 
-function init(bands){wrap.innerHTML='';labels.innerHTML='';bands.forEach(b=>{let d=document.createElement('div');d.className='bar';d.style.height='1%';wrap.appendChild(d);let l=document.createElement('div');l.textContent=b;labels.appendChild(l);});}
-es.onmessage=(e)=>{let p=JSON.parse(e.data); if(!wrap.children.length) init(p.bands);
-  wspan.textContent=p.weighting; tspan.textContent=p.ts;
-  if(p.la80!=null && p.la160!=null) vspan.textContent=`LA80: ${p.la80.toFixed(1)} dB(A) · LA160: ${p.la160.toFixed(1)} dB(A)`;
-  p.values.forEach((v,i)=>{let h=(v-minDB)/(maxDB-minDB); h=Math.max(0,Math.min(1,h)); let el=wrap.children[i]; el.style.height=(h*100)+'%'; el.setAttribute('data-v',v.toFixed(1));});
-};
+// Load configuration
+fetch('/api/config').then(r=>r.json()).then(data=>{
+  document.getElementById('minFreq').value=data.minFreq||31.5;
+  document.getElementById('maxFreq').value=data.maxFreq||20000;
+  if(data.bands==='1octave') document.getElementById('b1oct').checked=true;
+  else document.getElementById('b3oct').checked=true;
+  
+  for(let i=1;i<=4;i++){
+    document.getElementById(`t${i}freq`).value=data.triggers[i-1]?.freq||'';
+    document.getElementById(`t${i}amp`).value=data.triggers[i-1]?.amp||'';
+    document.getElementById(`t${i}dur`).value=data.triggers[i-1]?.duration||'';
+  }
+  
+  if(data.logic==='OR') document.getElementById('logicOr').checked=true;
+  else document.getElementById('logicAnd').checked=true;
+  
+  document.getElementById('storageLocation').value=data.storageLocation||'/media/wp_audio/events';
+  document.getElementById('recLength').value=data.recLength||'';
+  
+  document.getElementById('cal63').value=data.calibration?.cal63||'';
+  document.getElementById('cal250').value=data.calibration?.cal250||'';
+  document.getElementById('cal1000').value=data.calibration?.cal1000||'';
+  document.getElementById('cal4000').value=data.calibration?.cal4000||'';
+  document.getElementById('cal16000').value=data.calibration?.cal16000||'';
+}).catch(e=>console.error('Load error:',e));
 
-fetch('/api/triggers').then(r=>r.json()).then(data=>{
-  triggerData=data.triggers;
-  renderTriggers();
-});
-
-function renderTriggers(){
-  trigList.innerHTML='';
-  triggerData.forEach((t,i)=>{
-    const row=document.createElement('div');
-    row.className='trig-row';
-    row.innerHTML=`
-      <label>Trigger ${i+1}:</label>
-      <input type="number" data-idx="${i}" data-field="freq" value="${t.freq}" min="20" max="20000" step="1" placeholder="Frequenz (Hz)">
-      <input type="number" data-idx="${i}" data-field="amp" value="${t.amp}" min="0" max="120" step="0.5" placeholder="Amplitude (dB)">
-      <button data-idx="${i}">Speichern</button>
-    `;
-    trigList.appendChild(row);
-  });
-  trigList.addEventListener('click',e=>{
-    if(e.target.tagName==='BUTTON'){
-      const idx=parseInt(e.target.dataset.idx);
-      saveTrigger(idx);
+function saveConfig(){
+  const config={
+    bands:document.getElementById('b1oct').checked?'1octave':'3octave',
+    minFreq:parseFloat(document.getElementById('minFreq').value),
+    maxFreq:parseFloat(document.getElementById('maxFreq').value),
+    triggers:[
+      {freq:parseInt(document.getElementById('t1freq').value)||0,amp:parseFloat(document.getElementById('t1amp').value)||0,duration:parseFloat(document.getElementById('t1dur').value)||0},
+      {freq:parseInt(document.getElementById('t2freq').value)||0,amp:parseFloat(document.getElementById('t2amp').value)||0,duration:parseFloat(document.getElementById('t2dur').value)||0},
+      {freq:parseInt(document.getElementById('t3freq').value)||0,amp:parseFloat(document.getElementById('t3amp').value)||0,duration:parseFloat(document.getElementById('t3dur').value)||0},
+      {freq:parseInt(document.getElementById('t4freq').value)||0,amp:parseFloat(document.getElementById('t4amp').value)||0,duration:parseFloat(document.getElementById('t4dur').value)||0}
+    ],
+    logic:document.getElementById('logicOr').checked?'OR':'AND',
+    storageLocation:document.getElementById('storageLocation').value,
+    recLength:parseInt(document.getElementById('recLength').value)||0,
+    calibration:{
+      cal63:document.getElementById('cal63').value,
+      cal250:document.getElementById('cal250').value,
+      cal1000:document.getElementById('cal1000').value,
+      cal4000:document.getElementById('cal4000').value,
+      cal16000:document.getElementById('cal16000').value
     }
-  });
-}
-
-function saveTrigger(idx){
-  const freqInput=trigList.querySelector(`input[data-idx="${idx}"][data-field="freq"]`);
-  const ampInput=trigList.querySelector(`input[data-idx="${idx}"][data-field="amp"]`);
-  const freq=parseInt(freqInput.value);
-  const amp=parseFloat(ampInput.value);
-  if(isNaN(freq)||isNaN(amp)){statusDiv.textContent='Ungültige Eingabe';statusDiv.className='error';return;}
-  fetch('/api/triggers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:idx,freq:freq,amp:amp})})
+  };
+  
+  fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)})
   .then(r=>r.json())
   .then(data=>{
     if(data.success){
-      triggerData[idx]={freq:freq,amp:amp};
-      statusDiv.textContent=`Trigger ${idx+1} gespeichert: ${freq} Hz @ ${amp} dB`;
+      statusDiv.textContent='Configuration saved successfully!';
       statusDiv.className='success';
       setTimeout(()=>statusDiv.style.display='none',3000);
     }else{
-      statusDiv.textContent='Fehler beim Speichern';statusDiv.className='error';
+      statusDiv.textContent='Error saving configuration';
+      statusDiv.className='error';
     }
-  }).catch(e=>{statusDiv.textContent='Verbindungsfehler';statusDiv.className='error';});
+  }).catch(e=>{statusDiv.textContent='Connection error';statusDiv.className='error';});
 }
 </script>"""
 
@@ -174,6 +287,29 @@ class H(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control","no-store")
                 self.end_headers()
                 self.wfile.write(json.dumps(trigger_config).encode("utf-8"))
+                return
+            if self.path == "/api/config":
+                self.send_response(200)
+                self.send_header("Content-Type","application/json")
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
+                # Load saved config or return defaults
+                config_file = "/data/analyzer_config.json"
+                if os.path.exists(config_file):
+                    with open(config_file, "r") as f:
+                        config = json.load(f)
+                else:
+                    config = {
+                        "bands": "3octave",
+                        "minFreq": 31.5,
+                        "maxFreq": 20000,
+                        "triggers": trigger_config.get("triggers", []),
+                        "logic": "AND",
+                        "storageLocation": "/media/wp_audio/events",
+                        "recLength": 60,
+                        "calibration": {}
+                    }
+                self.wfile.write(json.dumps(config).encode("utf-8"))
                 return
             if self.path.endswith("/sse") or self.path == "/sse":
                 self.send_response(200)
@@ -202,9 +338,10 @@ class H(BaseHTTPRequestHandler):
     
     def do_POST(self):
         try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            
             if self.path == "/api/triggers":
-                content_length = int(self.headers.get('Content-Length', 0))
-                body = self.rfile.read(content_length).decode('utf-8')
                 try:
                     data = json.loads(body)
                     idx = data.get("idx")
@@ -226,6 +363,26 @@ class H(BaseHTTPRequestHandler):
                 self.send_response(400)
                 self.end_headers()
                 return
+            
+            if self.path == "/api/config":
+                try:
+                    data = json.loads(body)
+                    # Save entire configuration
+                    config_file = "/data/analyzer_config.json"
+                    with open(config_file, "w") as f:
+                        json.dump(data, f, indent=2)
+                    print(f"[wp-audio] Configuration saved: {len(data.get('triggers', []))} triggers, logic={data.get('logic')}")
+                    self.send_response(200)
+                    self.send_header("Content-Type","application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                    return
+                except Exception as e:
+                    print(f"[wp-audio] Config save error: {e}")
+                self.send_response(400)
+                self.end_headers()
+                return
+            
             self.send_response(404)
             self.end_headers()
         except Exception as e:
