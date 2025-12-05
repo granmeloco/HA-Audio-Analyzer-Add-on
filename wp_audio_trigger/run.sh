@@ -30,6 +30,18 @@ SPEC_INT="$(bashio::config 'spectrum_interval' || true)"
 UI_PORT="$(bashio::config 'ui_port' || true)"
 PULSE_SRC_CFG="$(bashio::config 'pulse_source' || true)"
 
+# Trigger configuration
+TRIG_FREQ_1="$(bashio::config 'trigger_freq_1' || echo 0)"
+TRIG_AMP_1="$(bashio::config 'trigger_amp_1' || echo 0.0)"
+TRIG_FREQ_2="$(bashio::config 'trigger_freq_2' || echo 0)"
+TRIG_AMP_2="$(bashio::config 'trigger_amp_2' || echo 0.0)"
+TRIG_FREQ_3="$(bashio::config 'trigger_freq_3' || echo 0)"
+TRIG_AMP_3="$(bashio::config 'trigger_amp_3' || echo 0.0)"
+TRIG_FREQ_4="$(bashio::config 'trigger_freq_4' || echo 0)"
+TRIG_AMP_4="$(bashio::config 'trigger_amp_4' || echo 0.0)"
+TRIG_FREQ_5="$(bashio::config 'trigger_freq_5' || echo 0)"
+TRIG_AMP_5="$(bashio::config 'trigger_amp_5' || echo 0.0)"
+
 # Defaults für optionale Felder
 case "${PUB_SPEC:-}" in ""|null) PUB_SPEC="true";; esac
 case "${SPEC_WGT:-}" in ""|null) SPEC_WGT="Z";; esac
@@ -129,4 +141,9 @@ exec python3 /app/wp_audio_trigger.py \
   --samplerate "${SR}" --device "${DEV_ARG}" \
   --event-dir "${EVENT_DIR}" --cal-file "${CAL_FILE}" \
   --publish-spectrum "${PUB_SPEC}" --spectrum-weighting "${SPEC_WGT}" --spectrum-interval "${SPEC_INT}" \
-  --ui-port "${UI_PORT}"
+  --ui-port "${UI_PORT}" \
+  --trigger-freq-1 "${TRIG_FREQ_1}" --trigger-amp-1 "${TRIG_AMP_1}" \
+  --trigger-freq-2 "${TRIG_FREQ_2}" --trigger-amp-2 "${TRIG_AMP_2}" \
+  --trigger-freq-3 "${TRIG_FREQ_3}" --trigger-amp-3 "${TRIG_AMP_3}" \
+  --trigger-freq-4 "${TRIG_FREQ_4}" --trigger-amp-4 "${TRIG_AMP_4}" \
+  --trigger-freq-5 "${TRIG_FREQ_5}" --trigger-amp-5 "${TRIG_AMP_5}"

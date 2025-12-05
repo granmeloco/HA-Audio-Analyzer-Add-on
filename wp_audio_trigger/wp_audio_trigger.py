@@ -53,38 +53,105 @@ def device_info():
 
 # ----------- Mini-Web-UI (Ingress) -----------
 latest_payload = {"bands": [], "values": [], "weighting": "Z", "ts": now_utc(), "la80": None, "la160": None}
+trigger_config = {"triggers": []}  # Will be populated from args
 
 HTML = """<!DOCTYPE html><meta charset=utf-8>
 <title>WP Audio</title>
 <style>
-body{font-family:system-ui,Segoe UI,Arial;margin:16px}
+body{font-family:system-ui,Segoe UI,Arial;margin:16px;background:#fafbfc}
 h2{margin:0 0 8px}
+h3{margin:24px 0 12px;font-size:18px;color:#333}
 #head{display:flex;gap:16px;align-items:baseline;margin-bottom:8px}
 #vals{font-weight:600}
-#wrap{display:grid;grid-template-columns:repeat(29,1fr);gap:3px;height:46vh;align-items:end;background:#f5f7f9;padding:8px;border-radius:8px}
+#wrap{display:grid;grid-template-columns:repeat(29,1fr);gap:3px;height:40vh;align-items:end;background:#f5f7f9;padding:8px;border-radius:8px}
 .bar{background:#4aa3a2;position:relative}
 .bar::after{content:attr(data-v);position:absolute;top:-1.4em;left:0;font:11px/1.2 monospace;color:#333}
 #labels{display:grid;grid-template-columns:repeat(29,1fr);gap:3px;margin-top:6px}
 #labels div{font:11px/1.1 monospace;text-align:center;color:#555}
 small{color:#666}
+#triggers{margin-top:24px;background:white;padding:16px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.trig-row{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}
+.trig-row:last-child{border-bottom:none}
+.trig-row label{font-weight:500;color:#555;min-width:80px}
+.trig-row input{padding:6px 10px;border:1px solid #ddd;border-radius:4px;font:inherit}
+.trig-row button{padding:6px 16px;background:#4aa3a2;color:white;border:none;border-radius:4px;cursor:pointer;font:inherit}
+.trig-row button:hover{background:#3a8a89}
+.trig-row button:disabled{background:#ccc;cursor:not-allowed}
+#status{margin-top:8px;padding:8px;border-radius:4px;font-size:14px;display:none}
+#status.success{background:#d4edda;color:#155724;display:block}
+#status.error{background:#f8d7da;color:#721c24;display:block}
 </style>
 <div id=head>
-  <h2>WP Audio – Live-Spektrum</h2>
+  <h2>WP Audio – Live-Spektrum & Trigger-Konfiguration</h2>
   <div id=vals>LA80: – dB(A) · LA160: – dB(A)</div>
 </div>
 <small>Bewertung: <span id=wgt>–</span> · Zeit: <span id=ts>–</span></small>
 <div id=wrap></div>
 <div id=labels></div>
+<div id=triggers>
+  <h3>Trigger-Konfiguration</h3>
+  <div id=trig-list></div>
+  <div id=status></div>
+</div>
 <script>
 const wrap=document.getElementById('wrap'), labels=document.getElementById('labels');
 const vspan=document.getElementById('vals'), wspan=document.getElementById('wgt'), tspan=document.getElementById('ts');
+const trigList=document.getElementById('trig-list'), statusDiv=document.getElementById('status');
 const es=new EventSource('sse'); let minDB=25, maxDB=100;
+let triggerData=[];
+
 function init(bands){wrap.innerHTML='';labels.innerHTML='';bands.forEach(b=>{let d=document.createElement('div');d.className='bar';d.style.height='1%';wrap.appendChild(d);let l=document.createElement('div');l.textContent=b;labels.appendChild(l);});}
 es.onmessage=(e)=>{let p=JSON.parse(e.data); if(!wrap.children.length) init(p.bands);
   wspan.textContent=p.weighting; tspan.textContent=p.ts;
   if(p.la80!=null && p.la160!=null) vspan.textContent=`LA80: ${p.la80.toFixed(1)} dB(A) · LA160: ${p.la160.toFixed(1)} dB(A)`;
   p.values.forEach((v,i)=>{let h=(v-minDB)/(maxDB-minDB); h=Math.max(0,Math.min(1,h)); let el=wrap.children[i]; el.style.height=(h*100)+'%'; el.setAttribute('data-v',v.toFixed(1));});
 };
+
+fetch('/api/triggers').then(r=>r.json()).then(data=>{
+  triggerData=data.triggers;
+  renderTriggers();
+});
+
+function renderTriggers(){
+  trigList.innerHTML='';
+  triggerData.forEach((t,i)=>{
+    const row=document.createElement('div');
+    row.className='trig-row';
+    row.innerHTML=`
+      <label>Trigger ${i+1}:</label>
+      <input type="number" data-idx="${i}" data-field="freq" value="${t.freq}" min="20" max="20000" step="1" placeholder="Frequenz (Hz)">
+      <input type="number" data-idx="${i}" data-field="amp" value="${t.amp}" min="0" max="120" step="0.5" placeholder="Amplitude (dB)">
+      <button data-idx="${i}">Speichern</button>
+    `;
+    trigList.appendChild(row);
+  });
+  trigList.addEventListener('click',e=>{
+    if(e.target.tagName==='BUTTON'){
+      const idx=parseInt(e.target.dataset.idx);
+      saveTrigger(idx);
+    }
+  });
+}
+
+function saveTrigger(idx){
+  const freqInput=trigList.querySelector(`input[data-idx="${idx}"][data-field="freq"]`);
+  const ampInput=trigList.querySelector(`input[data-idx="${idx}"][data-field="amp"]`);
+  const freq=parseInt(freqInput.value);
+  const amp=parseFloat(ampInput.value);
+  if(isNaN(freq)||isNaN(amp)){statusDiv.textContent='Ungültige Eingabe';statusDiv.className='error';return;}
+  fetch('/api/triggers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idx:idx,freq:freq,amp:amp})})
+  .then(r=>r.json())
+  .then(data=>{
+    if(data.success){
+      triggerData[idx]={freq:freq,amp:amp};
+      statusDiv.textContent=`Trigger ${idx+1} gespeichert: ${freq} Hz @ ${amp} dB`;
+      statusDiv.className='success';
+      setTimeout(()=>statusDiv.style.display='none',3000);
+    }else{
+      statusDiv.textContent='Fehler beim Speichern';statusDiv.className='error';
+    }
+  }).catch(e=>{statusDiv.textContent='Verbindungsfehler';statusDiv.className='error';});
+}
 </script>"""
 
 class H(BaseHTTPRequestHandler):
@@ -92,6 +159,10 @@ class H(BaseHTTPRequestHandler):
         if self.path in ("/","/index.html","//","/index.htm"):
             self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8")
             self.send_header("Cache-Control","no-store"); self.end_headers(); self.wfile.write(HTML.encode("utf-8")); return
+        if self.path == "/api/triggers":
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store"); self.end_headers()
+            self.wfile.write(json.dumps(trigger_config).encode("utf-8")); return
         if self.path.endswith("/sse") or self.path == "/sse":
             self.send_response(200)
             self.send_header("Content-Type","text/event-stream")
@@ -104,6 +175,28 @@ class H(BaseHTTPRequestHandler):
                     self.wfile.write(b": ping\n\n"); self.wfile.flush(); time.sleep(15)
             except BrokenPipeError:
                 return
+        self.send_response(404); self.end_headers()
+    
+    def do_POST(self):
+        if self.path == "/api/triggers":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+                idx = data.get("idx")
+                freq = data.get("freq")
+                amp = data.get("amp")
+                if idx is not None and 0 <= idx < len(trigger_config["triggers"]) and freq and amp:
+                    trigger_config["triggers"][idx] = {"freq": freq, "amp": amp}
+                    # Save to file for persistence
+                    config_file = "/data/trigger_config.json"
+                    with open(config_file, "w") as f:
+                        json.dump(trigger_config, f)
+                    self.send_response(200); self.send_header("Content-Type","application/json")
+                    self.end_headers(); self.wfile.write(json.dumps({"success": True}).encode("utf-8")); return
+            except:
+                pass
+            self.send_response(400); self.end_headers(); return
         self.send_response(404); self.end_headers()
 
 def start_http(port):
@@ -126,7 +219,28 @@ def main():
     ap.add_argument("--spectrum-weighting", choices=["A","Z"], default="Z")
     ap.add_argument("--spectrum-interval", type=float, default=1.0)   # <-- jetzt float
     ap.add_argument("--ui-port", type=int, default=8099)
+    # Trigger configuration arguments
+    for i in range(1, 6):
+        ap.add_argument(f"--trigger-freq-{i}", type=int, default=0)
+        ap.add_argument(f"--trigger-amp-{i}", type=float, default=0.0)
     args=ap.parse_args()
+
+    # Initialize trigger configuration
+    global trigger_config
+    trigger_config["triggers"] = [
+        {"freq": getattr(args, f"trigger_freq_{i}"), "amp": getattr(args, f"trigger_amp_{i}")}
+        for i in range(1, 6)
+    ]
+    # Load from persistent file if exists
+    config_file = "/data/trigger_config.json"
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r") as f:
+                saved_config = json.load(f)
+                trigger_config.update(saved_config)
+                print(f"[wp-audio] Trigger-Konfiguration geladen: {len(trigger_config['triggers'])} Trigger")
+        except:
+            pass
 
     # Web-UI
     start_http(args.ui_port)
