@@ -69,9 +69,9 @@ h1{text-align:center;font-size:22px;margin-bottom:20px;font-weight:normal}
 .field-label{font-size:13px;white-space:nowrap}
 input[type=text],input[type=number]{padding:5px 8px;border:1px solid #999;font-size:13px;width:100px;background:white}
 .freq-range{font-size:11px;color:#666}
-.trigger-grid{display:grid;grid-template-columns:140px 110px 180px 110px 180px 110px;gap:10px;align-items:center;margin-bottom:10px}
+.trigger-grid{display:grid;grid-template-columns:140px 110px 180px 180px;gap:10px;align-items:center;margin-bottom:10px}
 .trigger-grid.header{font-weight:normal;font-size:12px;margin-bottom:12px}
-.trigger-grid input{width:90px}
+.trigger-grid input{width:110px}
 .freq-input-row{display:flex;gap:25px;align-items:center;margin-top:10px}
 .calib-grid{display:flex;gap:12px;align-items:flex-start}
 .calib-col{display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -116,40 +116,30 @@ button:hover{background:#138496}
     <span></span>
     <span>Frequency [Hz]</span>
     <span>Min. amplitude [dBA]</span>
-    <span></span>
     <span>Min. duration [s]</span>
-    <span></span>
   </div>
   <div class=trigger-grid>
     <span class=field-label>1. Frequency [Hz]</span>
     <input type=number id=t1freq placeholder="">
-    <span class=field-label>Min. amplitude [dBA]</span>
     <input type=number id=t1amp placeholder="" step=0.1>
-    <span class=field-label>Min. duration [s]</span>
     <input type=number id=t1dur placeholder="" step=0.1>
   </div>
   <div class=trigger-grid>
     <span class=field-label>2. Frequency [Hz]</span>
     <input type=number id=t2freq placeholder="">
-    <span class=field-label>Min. amplitude [dBA]</span>
     <input type=number id=t2amp placeholder="" step=0.1>
-    <span class=field-label>Min. duration [s]</span>
     <input type=number id=t2dur placeholder="" step=0.1>
   </div>
   <div class=trigger-grid>
     <span class=field-label>3. Frequency [Hz]</span>
     <input type=number id=t3freq placeholder="">
-    <span class=field-label>Min. amplitude [dBA]</span>
     <input type=number id=t3amp placeholder="" step=0.1>
-    <span class=field-label>Min. duration [s]</span>
     <input type=number id=t3dur placeholder="" step=0.1>
   </div>
   <div class=trigger-grid>
     <span class=field-label>4. Frequency [Hz]</span>
     <input type=number id=t4freq placeholder="">
-    <span class=field-label>Min. amplitude [dBA]</span>
     <input type=number id=t4amp placeholder="" step=0.1>
-    <span class=field-label>Min. duration [s]</span>
     <input type=number id=t4dur placeholder="" step=0.1>
   </div>
   <div class=row>
