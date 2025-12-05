@@ -155,54 +155,95 @@ function saveTrigger(idx){
 </script>"""
 
 class H(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path in ("/","/index.html","//","/index.htm"):
-            self.send_response(200); self.send_header("Content-Type","text/html; charset=utf-8")
-            self.send_header("Cache-Control","no-store"); self.end_headers(); self.wfile.write(HTML.encode("utf-8")); return
-        if self.path == "/api/triggers":
-            self.send_response(200); self.send_header("Content-Type","application/json")
-            self.send_header("Cache-Control","no-store"); self.end_headers()
-            self.wfile.write(json.dumps(trigger_config).encode("utf-8")); return
-        if self.path.endswith("/sse") or self.path == "/sse":
-            self.send_response(200)
-            self.send_header("Content-Type","text/event-stream")
-            self.send_header("Cache-Control","no-store")
-            self.send_header("Connection","keep-alive")
-            self.end_headers()
-            self.wfile.write(f"data: {json.dumps(latest_payload)}\n\n".encode()); self.wfile.flush()
-            try:
-                while True:
-                    self.wfile.write(b": ping\n\n"); self.wfile.flush(); time.sleep(15)
-            except BrokenPipeError:
-                return
-        self.send_response(404); self.end_headers()
+    def log_message(self, format, *args):
+        # Log HTTP requests for debugging
+        print(f"[wp-audio] HTTP {format % args}")
     
-    def do_POST(self):
-        if self.path == "/api/triggers":
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length).decode('utf-8')
+    def do_GET(self):
+        try:
+            if self.path in ("/","/index.html","//","/index.htm"):
+                self.send_response(200)
+                self.send_header("Content-Type","text/html; charset=utf-8")
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
+                self.wfile.write(HTML.encode("utf-8"))
+                return
+            if self.path == "/api/triggers":
+                self.send_response(200)
+                self.send_header("Content-Type","application/json")
+                self.send_header("Cache-Control","no-store")
+                self.end_headers()
+                self.wfile.write(json.dumps(trigger_config).encode("utf-8"))
+                return
+            if self.path.endswith("/sse") or self.path == "/sse":
+                self.send_response(200)
+                self.send_header("Content-Type","text/event-stream")
+                self.send_header("Cache-Control","no-store")
+                self.send_header("Connection","keep-alive")
+                self.end_headers()
+                self.wfile.write(f"data: {json.dumps(latest_payload)}\n\n".encode())
+                self.wfile.flush()
+                try:
+                    while True:
+                        self.wfile.write(b": ping\n\n")
+                        self.wfile.flush()
+                        time.sleep(15)
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+            self.send_response(404)
+            self.end_headers()
+        except Exception as e:
+            print(f"[wp-audio] HTTP GET error: {e}")
             try:
-                data = json.loads(body)
-                idx = data.get("idx")
-                freq = data.get("freq")
-                amp = data.get("amp")
-                if idx is not None and 0 <= idx < len(trigger_config["triggers"]) and freq and amp:
-                    trigger_config["triggers"][idx] = {"freq": freq, "amp": amp}
-                    # Save to file for persistence
-                    config_file = "/data/trigger_config.json"
-                    with open(config_file, "w") as f:
-                        json.dump(trigger_config, f)
-                    self.send_response(200); self.send_header("Content-Type","application/json")
-                    self.end_headers(); self.wfile.write(json.dumps({"success": True}).encode("utf-8")); return
+                self.send_response(500)
+                self.end_headers()
             except:
                 pass
-            self.send_response(400); self.end_headers(); return
-        self.send_response(404); self.end_headers()
+    
+    def do_POST(self):
+        try:
+            if self.path == "/api/triggers":
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length).decode('utf-8')
+                try:
+                    data = json.loads(body)
+                    idx = data.get("idx")
+                    freq = data.get("freq")
+                    amp = data.get("amp")
+                    if idx is not None and 0 <= idx < len(trigger_config["triggers"]) and freq and amp:
+                        trigger_config["triggers"][idx] = {"freq": freq, "amp": amp}
+                        # Save to file for persistence
+                        config_file = "/data/trigger_config.json"
+                        with open(config_file, "w") as f:
+                            json.dump(trigger_config, f)
+                        self.send_response(200)
+                        self.send_header("Content-Type","application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                        return
+                except Exception as e:
+                    print(f"[wp-audio] POST processing error: {e}")
+                self.send_response(400)
+                self.end_headers()
+                return
+            self.send_response(404)
+            self.end_headers()
+        except Exception as e:
+            print(f"[wp-audio] HTTP POST error: {e}")
+            try:
+                self.send_response(500)
+                self.end_headers()
+            except:
+                pass
 
 def start_http(port):
-    srv = HTTPServer(("0.0.0.0", port), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    print(f"[wp-audio] Web-UI läuft auf Ingress (Port {port})")
+    try:
+        srv = HTTPServer(("0.0.0.0", port), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        print(f"[wp-audio] Web-UI läuft auf Ingress (Port {port})")
+    except Exception as e:
+        print(f"[wp-audio] FEHLER beim Starten des HTTP-Servers: {e}")
+        raise
 
 # --------------- Hauptprogramm ----------------
 def main():
