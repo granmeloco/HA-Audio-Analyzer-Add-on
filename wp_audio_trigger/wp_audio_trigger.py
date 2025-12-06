@@ -208,7 +208,7 @@ button:hover{background:#138496}
 const statusDiv=document.getElementById('status');
 
 // Load configuration
-fetch('/api/config').then(r=>r.json()).then(data=>{
+fetch('api/config').then(r=>r.json()).then(data=>{
   document.getElementById('minFreq').value=data.minFreq||31.5;
   document.getElementById('maxFreq').value=data.maxFreq||20000;
   if(data.bands==='1octave') document.getElementById('b1oct').checked=true;
@@ -257,7 +257,7 @@ function saveConfig(){
     }
   };
   
-  fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)})
+  fetch('api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)})
   .then(r=>r.json())
   .then(data=>{
     if(data.success){
@@ -268,7 +268,7 @@ function saveConfig(){
       statusDiv.textContent='Error saving configuration';
       statusDiv.className='error';
     }
-  }).catch(e=>{statusDiv.textContent='Connection error';statusDiv.className='error';});
+  }).catch(e=>{statusDiv.textContent='Connection error: '+e.message;statusDiv.className='error';});
 }
 </script>"""
 
