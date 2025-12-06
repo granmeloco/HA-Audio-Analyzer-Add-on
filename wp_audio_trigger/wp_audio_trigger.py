@@ -522,12 +522,19 @@ def main():
 
     # MQTT
     connected = {"ok": False}
+    record_spectrum = {"enabled": True}  # Control spectrum recording
+    
     def on_connect(client, userdata, flags, rc, properties=None):
         if rc == 0:
             connected["ok"] = True
             print("[wp-audio] MQTT verbunden")
             client.publish(f"{args.topic_base}/availability", "online", qos=1, retain=True)
             client.publish(f"{args.topic_base}/selftest", "ok", qos=1, retain=True)
+            
+            # Subscribe to control topics
+            client.subscribe(f"{args.topic_base}/record_spectrum/set")
+            print(f"[wp-audio] Subscribed to {args.topic_base}/record_spectrum/set", flush=True)
+            
             dev, dev_id = device_info(); disc = "homeassistant"
             cfg80 = {"name":"WP OctA 80 Hz","unique_id":f"{dev_id}_octA_80","state_topic":f"{args.topic_base}/octA_80",
                      "unit_of_measurement":"dB(A)","availability_topic":f"{args.topic_base}/availability",
@@ -538,18 +545,48 @@ def main():
             cfgspec={"name":"WP Spectrum","unique_id":f"{dev_id}_spectrum","state_topic":f"{args.topic_base}/spectrum",
                      "value_template":"{{ value_json.ts }}","json_attributes_topic":f"{args.topic_base}/spectrum",
                      "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:waveform"}
+            
+            # Create a switch to control spectrum recording
+            cfgswitch={"name":"Record Spectrum","unique_id":f"{dev_id}_record_spectrum",
+                      "state_topic":f"{args.topic_base}/record_spectrum/state",
+                      "command_topic":f"{args.topic_base}/record_spectrum/set",
+                      "payload_on":"ON","payload_off":"OFF",
+                      "state_on":"ON","state_off":"OFF",
+                      "optimistic":False,"qos":1,
+                      "availability_topic":f"{args.topic_base}/availability",
+                      "device":dev,"icon":"mdi:database"}
+            
             client.publish(f"{disc}/sensor/{dev_id}/octA_80/config",  json.dumps(cfg80),  qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/octA_160/config", json.dumps(cfg160), qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/spectrum/config", json.dumps(cfgspec), qos=1, retain=True)
+            client.publish(f"{disc}/switch/{dev_id}/record_spectrum/config", json.dumps(cfgswitch), qos=1, retain=True)
+            
+            # Publish initial state
+            client.publish(f"{args.topic_base}/record_spectrum/state", "ON" if record_spectrum["enabled"] else "OFF", qos=1, retain=True)
         else:
             print(f"[wp-audio] MQTT connect failed rc={rc}")
 
+    def on_message(client, userdata, msg):
+        try:
+            payload = msg.payload.decode('utf-8')
+            if msg.topic == f"{args.topic_base}/record_spectrum/set":
+                if payload == "ON":
+                    record_spectrum["enabled"] = True
+                    print("[wp-audio] Spectrum recording ENABLED", flush=True)
+                elif payload == "OFF":
+                    record_spectrum["enabled"] = False
+                    print("[wp-audio] Spectrum recording DISABLED", flush=True)
+                # Echo state back
+                client.publish(f"{args.topic_base}/record_spectrum/state", payload, qos=1, retain=True)
+        except Exception as e:
+            print(f"[wp-audio] MQTT message error: {e}", flush=True)
+    
     def on_disconnect(client, userdata, rc, properties=None):
         connected["ok"] = False
         print(f"[wp-audio] MQTT disconnected rc={rc}")
 
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, protocol=mqtt.MQTTv311)
-    client.on_connect = on_connect; client.on_disconnect = on_disconnect
+    client.on_connect = on_connect; client.on_disconnect = on_disconnect; client.on_message = on_message
     client.will_set(f"{args.topic_base}/availability", payload="offline", qos=1, retain=True)
     if args.mqtt_user: client.username_pw_set(args.mqtt_user, args.mqtt_pass)
     client.connect_async(args.mqtt_host, args.mqtt_port, 60); client.loop_start()
@@ -720,8 +757,10 @@ def main():
                 payload={"bands":[str(int(fc)) if fc>=100 else str(fc) for fc in FCS_FULL],
                          "values":vals,"weighting":args.spectrum_weighting,"ts":now_utc()}
                 latest_payload.update(payload)
-                try: client.publish(f"{args.topic_base}/spectrum", json.dumps(payload), qos=0)
-                except: pass
+                # Only publish to MQTT (and thus record to database) if recording is enabled
+                if record_spectrum["enabled"]:
+                    try: client.publish(f"{args.topic_base}/spectrum", json.dumps(payload), qos=0)
+                    except: pass
                 last_spec_pub = nowm
 
             # Dynamic Trigger Evaluation
