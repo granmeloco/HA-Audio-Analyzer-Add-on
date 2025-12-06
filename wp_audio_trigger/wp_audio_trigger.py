@@ -542,10 +542,10 @@ def main():
             cfg160={"name":"WP OctA 160 Hz","unique_id":f"{dev_id}_octA_160","state_topic":f"{args.topic_base}/octA_160",
                     "unit_of_measurement":"dB(A)","availability_topic":f"{args.topic_base}/availability",
                     "device":dev,"icon":"mdi:chart-bell-curve"}
-            cfgspec={"name":"WP Spectrum","unique_id":f"{dev_id}_spectrum","state_topic":f"{args.topic_base}/spectrum",
+            cfgspec={"name":"WP Spectrum","unique_id":f"{dev_id}_wp_spectrum","state_topic":f"{args.topic_base}/spectrum",
                      "value_template":"{{ value_json.ts }}","json_attributes_topic":f"{args.topic_base}/spectrum",
                      "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:waveform"}
-            cfgspec_live={"name":"WP Spectrum Live","unique_id":f"{dev_id}_spectrum_live","state_topic":f"{args.topic_base}/spectrum_live",
+            cfgspec_live={"name":"WP Spectrum Live","unique_id":f"{dev_id}_wp_spectrum_live","state_topic":f"{args.topic_base}/spectrum_live",
                      "value_template":"{{ value_json.ts }}","json_attributes_topic":f"{args.topic_base}/spectrum_live",
                      "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:waveform"}
             
@@ -561,8 +561,8 @@ def main():
             
             client.publish(f"{disc}/sensor/{dev_id}/octA_80/config",  json.dumps(cfg80),  qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/octA_160/config", json.dumps(cfg160), qos=1, retain=True)
-            client.publish(f"{disc}/sensor/{dev_id}/spectrum/config", json.dumps(cfgspec), qos=1, retain=True)
-            client.publish(f"{disc}/sensor/{dev_id}/spectrum_live/config", json.dumps(cfgspec_live), qos=1, retain=True)
+            client.publish(f"{disc}/sensor/{dev_id}/wp_spectrum/config", json.dumps(cfgspec), qos=1, retain=True)
+            client.publish(f"{disc}/sensor/{dev_id}/wp_spectrum_live/config", json.dumps(cfgspec_live), qos=1, retain=True)
             client.publish(f"{disc}/switch/{dev_id}/record_spectrum/config", json.dumps(cfgswitch), qos=1, retain=True)
             
             # Publish initial state
