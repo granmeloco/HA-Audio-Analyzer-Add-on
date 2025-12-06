@@ -637,6 +637,10 @@ def main():
     S = {"trig": False, "hold": 0, "post_left": 0, "peak80": -999.0, "peak160": -999.0,
          "cur_dir": None, "event_audio": [], "event_specs": []}
     os.makedirs(args.event_dir, exist_ok=True)
+    
+    # Trigger logging
+    trigger_log = []
+    trigger_states = {}  # Track active triggers: {freq: {"start_time": ts, "start_amp": amp}}
 
     def start_event():
         S["trig"]=True; S["post_left"]=args.post
@@ -654,11 +658,24 @@ def main():
             for r in S["event_specs"]:
                 f.write(r["ts"]+","+",".join(f"{r['LZ'][fc]:.2f}" for fc in FCS_LOW)+","+
                         ",".join(f"{r['LA'][fc]:.2f}" for fc in FCS_LOW)+"\n")
-        payload={"dir":S["cur_dir"],"audio":wav,"spectrum_csv":csv,"start":os.path.basename(S["cur_dir"]),
-                 "stop":now_utc(),"peak_A80":round(S["peak80"],2),"peak_A160":round(S["peak160"],2)}
+        
+        # Save trigger log
+        trigger_csv=os.path.join(S["cur_dir"],"trigger_log.csv")
+        with open(trigger_csv,"w") as f:
+            f.write("time,frequency,amplitude,duration\n")
+            for entry in trigger_log:
+                f.write(f"{entry['time']},{entry['frequency']},{entry['amplitude']},{entry['duration']}\n")
+        
+        payload={"dir":S["cur_dir"],"audio":wav,"spectrum_csv":csv,"trigger_log":trigger_csv,
+                 "start":os.path.basename(S["cur_dir"]),"stop":now_utc(),
+                 "peak_A80":round(S["peak80"],2),"peak_A160":round(S["peak160"],2),
+                 "trigger_count":len(trigger_log)}
         try: client.publish(f"{args.topic_base}/event", json.dumps(payload), qos=1)
         except: pass
-        print(f"[wp-audio] Event ENDE {S['cur_dir']} (PeakA80={S['peak80']:.1f}, PeakA160={S['peak160']:.1f})")
+        print(f"[wp-audio] Event ENDE {S['cur_dir']} (PeakA80={S['peak80']:.1f}, PeakA160={S['peak160']:.1f}, Triggers={len(trigger_log)})")
+        
+        # Clear trigger log for next event
+        trigger_log.clear()
         S.update({"trig":False,"cur_dir":None,"event_audio":[],"event_specs":[]})
 
     print(f"[wp-audio] Input-Device: {args.device if args.device else '(Default/Pulse)'}  SR={fs_target}")
@@ -774,12 +791,42 @@ def main():
             triggers = analyzer_config.get("triggers", [])
             logic = analyzer_config.get("logic", "OR")
             trigger_results = []
+            current_time = now_utc()
             
             for trig in triggers:
                 freq = trig.get("freq", 0)
                 amp = trig.get("amp", 0)
                 if freq > 0 and amp > 0 and freq in LA:
-                    trigger_results.append(LA[freq] >= amp)
+                    is_triggered = LA[freq] >= amp
+                    trigger_results.append(is_triggered)
+                    
+                    # Track trigger state changes
+                    if is_triggered:
+                        if freq not in trigger_states:
+                            # Trigger just activated
+                            trigger_states[freq] = {"start_time": current_time, "start_amp": LA[freq]}
+                            print(f"[wp-audio] Trigger ACTIVE: {freq} Hz @ {LA[freq]:.1f} dB (threshold {amp:.1f} dB)", flush=True)
+                    else:
+                        if freq in trigger_states:
+                            # Trigger just deactivated - log it
+                            start_info = trigger_states[freq]
+                            try:
+                                from datetime import datetime
+                                start_dt = datetime.fromisoformat(start_info["start_time"].replace('Z', '+00:00'))
+                                end_dt = datetime.fromisoformat(current_time.replace('Z', '+00:00'))
+                                duration = (end_dt - start_dt).total_seconds()
+                            except:
+                                duration = 0.0
+                            
+                            log_entry = {
+                                "time": start_info["start_time"],
+                                "frequency": freq,
+                                "amplitude": round(start_info["start_amp"], 2),
+                                "duration": round(duration, 2)
+                            }
+                            trigger_log.append(log_entry)
+                            print(f"[wp-audio] Trigger logged: {freq} Hz, {start_info['start_amp']:.1f} dB, {duration:.2f}s", flush=True)
+                            del trigger_states[freq]
             
             # Apply logic (OR = any trigger, AND = all triggers)
             if logic == "AND":
