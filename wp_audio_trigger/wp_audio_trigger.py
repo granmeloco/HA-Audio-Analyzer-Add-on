@@ -546,18 +546,17 @@ def main():
             print(f"[wp-audio] Subscribed to {args.topic_base}/record_spectrum/set", flush=True)
             
             dev, dev_id = device_info(); disc = "homeassistant"
-            cfg80 = {"name":"WP OctA 80 Hz","unique_id":f"{dev_id}_octA_80","state_topic":f"{args.topic_base}/octA_80",
-                     "unit_of_measurement":"dB(A)","availability_topic":f"{args.topic_base}/availability",
-                     "device":dev,"icon":"mdi:chart-bell-curve"}
-            cfg160={"name":"WP OctA 160 Hz","unique_id":f"{dev_id}_octA_160","state_topic":f"{args.topic_base}/octA_160",
-                    "unit_of_measurement":"dB(A)","availability_topic":f"{args.topic_base}/availability",
-                    "device":dev,"icon":"mdi:chart-bell-curve"}
             cfgspec={"name":"WP Spectrum","unique_id":f"{dev_id}_wp_spectrum","state_topic":f"{args.topic_base}/spectrum",
                      "value_template":"{{ value_json.ts }}","json_attributes_topic":f"{args.topic_base}/spectrum",
                      "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:waveform"}
             cfgspec_live={"name":"WP Spectrum Live","unique_id":f"{dev_id}_wp_spectrum_live","state_topic":f"{args.topic_base}/spectrum_live",
                      "value_template":"{{ value_json.ts }}","json_attributes_topic":f"{args.topic_base}/spectrum_live",
                      "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:waveform"}
+            
+            # Event log sensor
+            cfgevent={"name":"Event Log","unique_id":f"{dev_id}_event_log","state_topic":f"{args.topic_base}/event",
+                     "value_template":"{{ value_json.start }}","json_attributes_topic":f"{args.topic_base}/event",
+                     "availability_topic":f"{args.topic_base}/availability","device":dev,"icon":"mdi:calendar-clock"}
             
             # Create a switch to control spectrum recording
             cfgswitch={"name":"Record Spectrum","unique_id":f"{dev_id}_record_spectrum",
@@ -569,10 +568,9 @@ def main():
                       "availability_topic":f"{args.topic_base}/availability",
                       "device":dev,"icon":"mdi:database"}
             
-            client.publish(f"{disc}/sensor/{dev_id}/octA_80/config",  json.dumps(cfg80),  qos=1, retain=True)
-            client.publish(f"{disc}/sensor/{dev_id}/octA_160/config", json.dumps(cfg160), qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/wp_spectrum/config", json.dumps(cfgspec), qos=1, retain=True)
             client.publish(f"{disc}/sensor/{dev_id}/wp_spectrum_live/config", json.dumps(cfgspec_live), qos=1, retain=True)
+            client.publish(f"{disc}/sensor/{dev_id}/event_log/config", json.dumps(cfgevent), qos=1, retain=True)
             client.publish(f"{disc}/switch/{dev_id}/record_spectrum/config", json.dumps(cfgswitch), qos=1, retain=True)
             
             # Publish initial state
@@ -761,15 +759,7 @@ def main():
             la80 = LA.get(80, 0.0)
             la160 = LA.get(160, 0.0)
 
-            # MQTT Live (publish first band and any legacy frequencies)
-            try:
-                if 80 in LA:
-                    client.publish(f"{args.topic_base}/octA_80", f"{la80:.2f}", qos=0)
-                if 160 in LA:
-                    client.publish(f"{args.topic_base}/octA_160", f"{la160:.2f}", qos=0)
-            except: pass
-
-            # UI Snapshot
+            # UI Snapshot (keep la80/la160 for internal use)
             latest_payload.update({"la80": float(la80), "la160": float(la160)})
 
             # Pre-Buffer / Event-Aufnahme
