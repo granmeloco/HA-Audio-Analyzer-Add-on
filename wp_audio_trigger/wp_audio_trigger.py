@@ -186,6 +186,10 @@ button:hover{background:#138496}
     <button class=browse-btn onclick="browseFolder()">Browse...</button>
   </div>
   <div class=row>
+    <span class=field-label>Pre-buffer time [s]</span>
+    <input type=number id=preBuffer placeholder="" step=1>
+  </div>
+  <div class=row>
     <span class=field-label>Recording length [s]</span>
     <input type=number id=recLength placeholder="" step=1>
   </div>
@@ -242,6 +246,7 @@ fetch('api/config').then(r=>r.json()).then(data=>{
   else document.getElementById('logicAnd').checked=true;
   
   document.getElementById('storageLocation').value=data.storageLocation||'/media/wp_audio/events';
+  document.getElementById('preBuffer').value=data.preBuffer||10;
   document.getElementById('recLength').value=data.recLength||'';
   
   document.getElementById('cal63').value=data.calibration?.cal63||'';
@@ -264,6 +269,7 @@ function saveConfig(){
     ],
     logic:document.getElementById('logicOr').checked?'OR':'AND',
     storageLocation:document.getElementById('storageLocation').value,
+    preBuffer:parseInt(document.getElementById('preBuffer').value)||10,
     recLength:parseInt(document.getElementById('recLength').value)||0,
     calibration:{
       cal63:document.getElementById('cal63').value,
@@ -476,26 +482,7 @@ def start_http(port):
 
 # --------------- Hauptprogramm ----------------
 def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--mqtt-host",default="core-mosquitto"); ap.add_argument("--mqtt-port",type=int,default=1883)
-    ap.add_argument("--mqtt-user",default=""); ap.add_argument("--mqtt-pass",default="")
-    ap.add_argument("--topic-base",default="wp_audio")
-    ap.add_argument("--thresh-a80",type=float,default=50.0); ap.add_argument("--thresh-a160",type=float,default=50.0)
-    ap.add_argument("--hold-sec",type=int,default=2)
-    ap.add_argument("--pre",type=int,default=20); ap.add_argument("--post",type=int,default=30)
-    ap.add_argument("--samplerate",type=int,default=48000); ap.add_argument("--device",default="")
-    ap.add_argument("--event-dir",default="/media/wp_audio/events"); ap.add_argument("--cal-file",default="/data/calibration.json")
-    ap.add_argument("--publish-spectrum", type=lambda v:str(v).lower() in ("1","true","yes"), default=True)
-    ap.add_argument("--spectrum-weighting", choices=["A","Z"], default="Z")
-    ap.add_argument("--spectrum-interval", type=float, default=1.0)   # <-- jetzt float
-    ap.add_argument("--ui-port", type=int, default=8099)
-    # Trigger configuration arguments
-    for i in range(1, 6):
-        ap.add_argument(f"--trigger-freq-{i}", type=int, default=0)
-        ap.add_argument(f"--trigger-amp-{i}", type=float, default=0.0)
-    args=ap.parse_args()
-
-    # Load full analyzer configuration
+    # Load full analyzer configuration FIRST, before argument parser
     global trigger_config
     analyzer_config = {
         "bands": "3octave",  # default 1/3-octave
@@ -503,8 +490,9 @@ def main():
         "maxFreq": 20000,
         "triggers": [],
         "logic": "OR",
-        "storageLocation": args.event_dir,
-        "recLength": args.post,
+        "storageLocation": "/media/wp_audio/events",
+        "preBuffer": 10,
+        "recLength": 30,
         "calibration": {"cal63": 0, "cal250": 0, "cal1000": 0, "cal4000": 0, "cal16000": 0}
     }
     
@@ -518,6 +506,26 @@ def main():
                 print(f"[wp-audio] Analyzer configuration loaded: {analyzer_config['bands']} bands, {len(analyzer_config['triggers'])} triggers, logic={analyzer_config['logic']}", flush=True)
         except Exception as e:
             print(f"[wp-audio] Error loading analyzer config: {e}", flush=True)
+    
+    # Now create argument parser with loaded config values
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--mqtt-host",default="core-mosquitto"); ap.add_argument("--mqtt-port",type=int,default=1883)
+    ap.add_argument("--mqtt-user",default=""); ap.add_argument("--mqtt-pass",default="")
+    ap.add_argument("--topic-base",default="wp_audio")
+    ap.add_argument("--thresh-a80",type=float,default=50.0); ap.add_argument("--thresh-a160",type=float,default=50.0)
+    ap.add_argument("--hold-sec",type=int,default=2)
+    ap.add_argument("--pre",type=int,default=analyzer_config.get("preBuffer", 10)); ap.add_argument("--post",type=int,default=30)
+    ap.add_argument("--samplerate",type=int,default=48000); ap.add_argument("--device",default="")
+    ap.add_argument("--event-dir",default=analyzer_config.get("storageLocation", "/media/wp_audio/events")); ap.add_argument("--cal-file",default="/data/calibration.json")
+    ap.add_argument("--publish-spectrum", type=lambda v:str(v).lower() in ("1","true","yes"), default=True)
+    ap.add_argument("--spectrum-weighting", choices=["A","Z"], default="Z")
+    ap.add_argument("--spectrum-interval", type=float, default=1.0)   # <-- jetzt float
+    ap.add_argument("--ui-port", type=int, default=8099)
+    # Trigger configuration arguments
+    for i in range(1, 6):
+        ap.add_argument(f"--trigger-freq-{i}", type=int, default=0)
+        ap.add_argument(f"--trigger-amp-{i}", type=float, default=0.0)
+    args=ap.parse_args()
     
     # Legacy: initialize trigger_config from command-line args if no saved config
     trigger_config["triggers"] = analyzer_config.get("triggers", [
@@ -658,8 +666,10 @@ def main():
     a_low    = {fc: a_corr(fc) for fc in FCS_LOW}
 
     pre_buf=deque(maxlen=max(1,int(args.pre/block_sec)))
+    spec_buf=deque(maxlen=max(1,int(args.pre/block_sec)))  # Ring buffer for spectrum data
     S = {"trig": False, "hold": 0, "post_left": 0, "peak80": -999.0, "peak160": -999.0,
-         "cur_dir": None, "event_audio": [], "event_specs": []}
+         "cur_dir": None, "event_audio": [], "event_specs": [], "overall_dbA": [],
+         "event_start_time": None, "actual_duration": 0, "recording_stopped": False}
     os.makedirs(args.event_dir, exist_ok=True)
     
     # Trigger logging
@@ -690,17 +700,65 @@ def main():
             for entry in trigger_log:
                 f.write(f"{entry['time']},{entry['frequency']},{entry['amplitude']},{entry['duration']}\n")
         
-        payload={"dir":S["cur_dir"],"audio":wav,"spectrum_csv":csv,"trigger_log":trigger_csv,
-                 "start":os.path.basename(S["cur_dir"]),"stop":now_utc(),
-                 "peak_A80":round(S["peak80"],2),"peak_A160":round(S["peak160"],2),
-                 "trigger_count":len(trigger_log)}
+        # Calculate overall dB(A) statistics
+        max_overall_dbA = max(S["overall_dbA"]) if S["overall_dbA"] else 0.0
+        avg_overall_dbA = sum(S["overall_dbA"]) / len(S["overall_dbA"]) if S["overall_dbA"] else 0.0
+        
+        # Save comprehensive event metadata as JSON
+        metadata = {
+            "event_id": os.path.basename(S["cur_dir"]),
+            "start_time": os.path.basename(S["cur_dir"]),
+            "stop_time": now_utc(),
+            "configuration": {
+                "bands": analyzer_config.get("bands", "3octave"),
+                "minFreq": analyzer_config.get("minFreq", 31.5),
+                "maxFreq": analyzer_config.get("maxFreq", 20000),
+                "triggers": analyzer_config.get("triggers", []),
+                "logic": analyzer_config.get("logic", "OR"),
+                "preBuffer": analyzer_config.get("preBuffer", 10),
+                "recLength": analyzer_config.get("recLength", 30)
+            },
+            "statistics": {
+                "max_overall_dbA": round(max_overall_dbA, 2),
+                "avg_overall_dbA": round(avg_overall_dbA, 2),
+                "peak_A80": round(S["peak80"], 2),
+                "peak_A160": round(S["peak160"], 2),
+                "trigger_count": len(trigger_log),
+                "actual_duration_seconds": round(S["actual_duration"], 2),
+                "recorded_duration_seconds": len(S["event_specs"]) * block_sec if S["event_specs"] else 0
+            },
+            "files": {
+                "audio": "audio.flac",
+                "spectrum": "spectrum.csv",
+                "trigger_log": "trigger_log.csv",
+                "metadata": "event_metadata.json"
+            },
+            "triggers": trigger_log
+        }
+        
+        metadata_file = os.path.join(S["cur_dir"], "event_metadata.json")
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
+        
+        # Simplified MQTT payload with key metadata
+        payload = {
+            "event_id": metadata["event_id"],
+            "start": metadata["start_time"],
+            "stop": metadata["stop_time"],
+            "max_overall_dbA": metadata["statistics"]["max_overall_dbA"],
+            "avg_overall_dbA": metadata["statistics"]["avg_overall_dbA"],
+            "trigger_count": metadata["statistics"]["trigger_count"],
+            "actual_duration": metadata["statistics"]["actual_duration_seconds"],
+            "recorded_duration": metadata["statistics"]["recorded_duration_seconds"],
+            "event_dir": S["cur_dir"]
+        }
         try: client.publish(f"{args.topic_base}/event", json.dumps(payload), qos=1)
         except: pass
-        print(f"[wp-audio] Event ENDE {S['cur_dir']} (PeakA80={S['peak80']:.1f}, PeakA160={S['peak160']:.1f}, Triggers={len(trigger_log)})")
+        print(f"[wp-audio] Event ENDE {S['cur_dir']} (Duration={S['actual_duration']:.1f}s, Recorded={len(S['event_specs']) * block_sec:.1f}s, Max dB(A)={max_overall_dbA:.1f}, Avg dB(A)={avg_overall_dbA:.1f}, Triggers={len(trigger_log)})")
         
         # Clear trigger log for next event
         trigger_log.clear()
-        S.update({"trig":False,"cur_dir":None,"event_audio":[],"event_specs":[]})
+        S.update({"trig":False,"cur_dir":None,"event_audio":[],"event_specs":[],"overall_dbA":[],"event_start_time":None,"actual_duration":0,"recording_stopped":False})
 
     print(f"[wp-audio] Input-Device: {args.device if args.device else '(Default/Pulse)'}  SR={fs_target}")
 
@@ -781,6 +839,7 @@ def main():
             # Pre-Buffer / Event-Aufnahme
             pre_buf.append(x.copy())
             rec={"ts":now_utc(),"LZ":LZ,"LA":LA}
+            spec_buf.append(rec)  # Always buffer spectrum data for events
 
             # volles Spektrum (optional, schneller dank kürzerer Blöcke)
             nowm = time.monotonic()
@@ -875,20 +934,40 @@ def main():
                     if S["hold"]>=args.hold_sec:
                         S["trig"]=True; S["post_left"]=rec_length
                         S["cur_dir"]=os.path.join(storage_dir, now_utc()); os.makedirs(S["cur_dir"], exist_ok=True)
-                        S["event_audio"]=list(pre_buf); S["event_specs"]=[]; S["peak80"]=-999.0; S["peak160"]=-999.0
-                        print(f"[wp-audio] Event START {S['cur_dir']}")
+                        S["event_audio"]=list(pre_buf); S["event_specs"]=list(spec_buf); S["peak80"]=-999.0; S["peak160"]=-999.0; S["overall_dbA"]=[]
+                        S["event_start_time"]=time.time(); S["actual_duration"]=0; S["recording_stopped"]=False
+                        print(f"[wp-audio] Event START {S['cur_dir']} (Pre-buffer: {len(pre_buf)} audio blocks, {len(spec_buf)} spectrum blocks)")
                         S["hold"]=0
                 else:
                     S["hold"]=0
             else:
-                S["event_audio"].append(x.copy()); S["event_specs"].append(rec)
-                S["peak80"]=max(S["peak80"],la80); S["peak160"]=max(S["peak160"],la160)
+                # Track actual event duration
+                S["actual_duration"] = time.time() - S["event_start_time"]
+                
+                # Only record audio/spectrum if we haven't exceeded recording length
+                if not S["recording_stopped"]:
+                    S["event_audio"].append(x.copy()); S["event_specs"].append(rec)
+                    S["peak80"]=max(S["peak80"],la80); S["peak160"]=max(S["peak160"],la160)
+                    
+                    # Calculate overall dB(A) from all frequency bands (energy sum)
+                    # Convert dB to linear, sum energy, convert back to dB
+                    total_energy = sum(10**(la/10) for la in LA.values())
+                    overall_dbA = 10 * np.log10(total_energy) if total_energy > 0 else 0.0
+                    S["overall_dbA"].append(overall_dbA)
+                
                 if trigger_event:
+                    # Trigger still active, reset post timer
                     S["post_left"]=rec_length
                 else:
+                    # Trigger ended, count down to finish event
                     S["post_left"]-=block_sec
                     if S["post_left"]<=0:
                         end_event(current_fs)
+                
+                # Check if we've exceeded configured recording length
+                if not S["recording_stopped"] and S["actual_duration"] >= rec_length:
+                    S["recording_stopped"] = True
+                    print(f"[wp-audio] Recording limit reached ({rec_length}s), but continuing to track event duration", flush=True)
 
     finally:
         try:
