@@ -568,31 +568,29 @@ def main():
         except Exception as e:
             print(f"[wp-audio] Error loading analyzer config: {e}", flush=True)
     
-    # Now create argument parser with loaded config values
+    # Now create argument parser - only infrastructure/technical settings from config.yaml
     ap=argparse.ArgumentParser()
-    ap.add_argument("--mqtt-host",default="core-mosquitto"); ap.add_argument("--mqtt-port",type=int,default=1883)
-    ap.add_argument("--mqtt-user",default=""); ap.add_argument("--mqtt-pass",default="")
+    ap.add_argument("--mqtt-host",default="core-mosquitto")
+    ap.add_argument("--mqtt-port",type=int,default=1883)
+    ap.add_argument("--mqtt-user",default="")
+    ap.add_argument("--mqtt-pass",default="")
     ap.add_argument("--topic-base",default="wp_audio")
-    ap.add_argument("--thresh-a80",type=float,default=50.0); ap.add_argument("--thresh-a160",type=float,default=50.0)
-    ap.add_argument("--hold-sec",type=int,default=2)
-    ap.add_argument("--pre",type=int,default=analyzer_config.get("preBuffer", 10)); ap.add_argument("--post",type=int,default=30)
-    ap.add_argument("--samplerate",type=int,default=48000); ap.add_argument("--device",default="")
-    ap.add_argument("--event-dir",default=analyzer_config.get("storageLocation", "/media/wp_audio/events")); ap.add_argument("--cal-file",default="/data/calibration.json")
-    ap.add_argument("--publish-spectrum", type=lambda v:str(v).lower() in ("1","true","yes"), default=True)
-    ap.add_argument("--spectrum-weighting", choices=["A","Z","C"], default=analyzer_config.get("dbWeighting", "A"))
-    ap.add_argument("--spectrum-interval", type=float, default=analyzer_config.get("publishInterval", 1.0))
+    ap.add_argument("--samplerate",type=int,default=48000)
+    ap.add_argument("--device",default="")
+    ap.add_argument("--cal-file",default="/data/calibration.json")
     ap.add_argument("--ui-port", type=int, default=8099)
-    # Trigger configuration arguments
-    for i in range(1, 6):
-        ap.add_argument(f"--trigger-freq-{i}", type=int, default=0)
-        ap.add_argument(f"--trigger-amp-{i}", type=float, default=0.0)
     args=ap.parse_args()
     
-    # Legacy: initialize trigger_config from command-line args if no saved config
-    trigger_config["triggers"] = analyzer_config.get("triggers", [
-        {"freq": getattr(args, f"trigger_freq_{i}"), "amp": getattr(args, f"trigger_amp_{i}")}
-        for i in range(1, 6)
-    ])
+    # All analysis settings come from analyzer_config (UI)
+    args.pre = analyzer_config.get("preBuffer", 10)
+    args.post = 30  # Fixed post-trigger time
+    args.event_dir = analyzer_config.get("storageLocation", "/media/wp_audio/events")
+    args.publish_spectrum = True
+    args.spectrum_weighting = analyzer_config.get("dbWeighting", "A")
+    args.spectrum_interval = analyzer_config.get("publishInterval", 1.0)
+    
+    # Initialize trigger_config from saved config
+    trigger_config["triggers"] = analyzer_config.get("triggers", [])
 
     # Web-UI
     print(f"[wp-audio] Starting HTTP server on port {args.ui_port}...", flush=True)

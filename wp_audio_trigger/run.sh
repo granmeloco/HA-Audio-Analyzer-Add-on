@@ -13,42 +13,14 @@ MQTT_PORT="$(bashio::config 'mqtt_port')"
 MQTT_USER="$(bashio::config 'mqtt_user')"
 MQTT_PASS="$(bashio::config 'mqtt_password')"
 TOPIC_BASE="$(bashio::config 'topic_base')"
-
-THRESH_A80="$(bashio::config 'thresh_a80')"
-THRESH_A160="$(bashio::config 'thresh_a160')"
-HOLD_SEC="$(bashio::config 'hold_sec')"
-PRE_TRIGGER="$(bashio::config 'pre_trigger')"
-POST_TRIGGER="$(bashio::config 'post_trigger')"
 SR="$(bashio::config 'samplerate')"
-DEVICE="$(bashio::config 'device')"     # leer = Pulse-Default
-EVENT_DIR="$(bashio::config 'event_dir')"
+DEVICE="$(bashio::config 'device')"
 CAL_FILE="$(bashio::config 'calibration_file')"
-
-PUB_SPEC="$(bashio::config 'publish_spectrum' || true)"
-SPEC_WGT="$(bashio::config 'spectrum_weighting' || true)"
-SPEC_INT="$(bashio::config 'spectrum_interval' || true)"
-UI_PORT="$(bashio::config 'ui_port' || true)"
+UI_PORT="$(bashio::config 'ui_port' || echo 8099)"
 PULSE_SRC_CFG="$(bashio::config 'pulse_source' || true)"
 
-# Trigger configuration
-TRIG_FREQ_1="$(bashio::config 'trigger_freq_1' || echo 0)"
-TRIG_AMP_1="$(bashio::config 'trigger_amp_1' || echo 0.0)"
-TRIG_FREQ_2="$(bashio::config 'trigger_freq_2' || echo 0)"
-TRIG_AMP_2="$(bashio::config 'trigger_amp_2' || echo 0.0)"
-TRIG_FREQ_3="$(bashio::config 'trigger_freq_3' || echo 0)"
-TRIG_AMP_3="$(bashio::config 'trigger_amp_3' || echo 0.0)"
-TRIG_FREQ_4="$(bashio::config 'trigger_freq_4' || echo 0)"
-TRIG_AMP_4="$(bashio::config 'trigger_amp_4' || echo 0.0)"
-TRIG_FREQ_5="$(bashio::config 'trigger_freq_5' || echo 0)"
-TRIG_AMP_5="$(bashio::config 'trigger_amp_5' || echo 0.0)"
-
-# Defaults für optionale Felder
-case "${PUB_SPEC:-}" in ""|null) PUB_SPEC="true";; esac
-case "${SPEC_WGT:-}" in ""|null) SPEC_WGT="Z";; esac
-case "${SPEC_INT:-}" in ""|null) SPEC_INT="1";; esac
+# Defaults for optional fields
 case "${UI_PORT:-}" in ""|null) UI_PORT="8099";; esac
-
-mkdir -p "$EVENT_DIR"
 
 # --- MQTT-Creds automatisch aus HA (falls leer) ---
 if { [ -z "${MQTT_USER}" ] || [ -z "${MQTT_PASS}" ]; }; then
@@ -136,14 +108,6 @@ exec python3 /app/wp_audio_trigger.py \
   --mqtt-host "${MQTT_HOST}" --mqtt-port "${MQTT_PORT}" \
   --mqtt-user "${MQTT_USER}" --mqtt-pass "${MQTT_PASS}" \
   --topic-base "${TOPIC_BASE}" \
-  --thresh-a80 "${THRESH_A80}" --thresh-a160 "${THRESH_A160}" \
-  --hold-sec "${HOLD_SEC}" --pre "${PRE_TRIGGER}" --post "${POST_TRIGGER}" \
   --samplerate "${SR}" --device "${DEV_ARG}" \
-  --event-dir "${EVENT_DIR}" --cal-file "${CAL_FILE}" \
-  --publish-spectrum "${PUB_SPEC}" --spectrum-weighting "${SPEC_WGT}" --spectrum-interval "${SPEC_INT}" \
-  --ui-port "${UI_PORT}" \
-  --trigger-freq-1 "${TRIG_FREQ_1}" --trigger-amp-1 "${TRIG_AMP_1}" \
-  --trigger-freq-2 "${TRIG_FREQ_2}" --trigger-amp-2 "${TRIG_AMP_2}" \
-  --trigger-freq-3 "${TRIG_FREQ_3}" --trigger-amp-3 "${TRIG_AMP_3}" \
-  --trigger-freq-4 "${TRIG_FREQ_4}" --trigger-amp-4 "${TRIG_AMP_4}" \
-  --trigger-freq-5 "${TRIG_FREQ_5}" --trigger-amp-5 "${TRIG_AMP_5}"
+  --cal-file "${CAL_FILE}" \
+  --ui-port "${UI_PORT}"
