@@ -98,7 +98,7 @@ input[type=text],input[type=number]{padding:5px 8px;border:1px solid #999;font-s
 .freq-input-row{display:flex;gap:25px;align-items:center;margin-top:10px}
 .calib-grid{display:flex;gap:12px;align-items:flex-start}
 .calib-col{display:flex;flex-direction:column;align-items:center;gap:4px}
-.calib-col input{width:70px;text-align:center}
+.calib-col input{width:56px;text-align:center}
 .calib-col span{font-size:11px}
 .calib-label{font-size:13px;margin-right:8px;align-self:center}
 button{background:#17a2b8;color:white;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;font-size:13px;margin-top:10px}
@@ -260,7 +260,7 @@ button:hover{background:#138496}
       <span>16000Hz</span>
     </div>
   </div>
-        <div style="font-size:13px;margin-top:6px;color:#333">1-octave calibration will automatically interpolate to 1/3-octave</div>
+        <div style="font-size:13px;margin-top:6px;color:#333">1-octave calibration will automatically interpolate to selected analyzed octave</div>
 </div>
 
 <button onclick="saveConfig()">Save Configuration</button>
