@@ -56,7 +56,8 @@ def load_cal(path):
         with open(path) as f:
             d=json.load(f)
         off=float(d.get("offset_db",0.0))
-        band={int(k):float(v) for k,v in d.get("band_corr_db",{}).items()}
+        # Preserve decimal center frequencies (e.g., 31.5 Hz)
+        band={float(k):float(v) for k,v in d.get("band_corr_db",{}).items()}
         print(f"[wp-audio] Kalibrierung: offset_db={off} band_corr={band}")
     except Exception:
         print(f"[wp-audio] Keine/ungültige Kalibrierdatei: {path} (verwende 0 dB)")
@@ -111,13 +112,13 @@ button:hover{background:#138496}
 
 <div class=section>
   <div class=section-title>Spectrum analyzer settings</div>
-  <div class=row>
-    <div class=radio-group>
-      <input type=radio name=bands id=b1oct value=1octave>
-      <label for=b1oct>1-octave bands</label>
+    <div class=row>
+        <div class=radio-group>
+            <input type=radio name=bands id=b1oct value=1octave>
+            <label for=b1oct>1-octave bands</label>
+        </div>
+        <span class=freq-range>(31.5 - 63 - 125 - 250 - 500 - 1000 - 2000 - 4000 - 8000 - 16000)</span>
     </div>
-    <span class=freq-range>(31.5 - 63 - 125 - 250 - 500 - 1000 - 2000 - 4000 - 8000 - 16000)</span>
-  </div>
   <div class=row>
     <div class=radio-group>
       <input type=radio name=bands id=b2oct value=2octave>
@@ -125,13 +126,13 @@ button:hover{background:#138496}
     </div>
     <span class=freq-range>(31.5 - 44.7 - 63 - 89.4 - 125 - 177 - 250 - 355 - 500 - 707 - 1000 - 1414 - 2000 - 2828 - 4000 - 5657 - 8000 - 11314 - 16000)</span>
   </div>
-  <div class=row>
-    <div class=radio-group>
-      <input type=radio name=bands id=b3oct value=3octave checked>
-      <label for=b3oct>1/3-octave bands</label>
+    <div class=row>
+        <div class=radio-group>
+            <input type=radio name=bands id=b3oct value=3octave checked>
+            <label for=b3oct>1/3-octave bands</label>
+        </div>
+        <span class=freq-range>(1 - 1.25 - 1.6 - 2 - 2.5 - 3.15 - 4.5 - 6.3 - 8 - 10 - 12.5 - 16 - 20 - 25 - 31.5 - 40 - 50 - 63 - 80 - 100 - 125 - 160 - 200 - 250 - 315 - 400 - 500 - 630 - 800 - 1000 - 1250 - 1600 - 2000 - 2500 - 3150 - 4000 - 5000 - 6300 - 8000 - 10000 - 12500 - 16000 - 20000 Hz)</span>
     </div>
-    <span class=freq-range>(1 - 1.25 - 1.6 - 2 - 2.5 - 3.15 - 4.5 - 6.3 - 8 - 10 - 12.5 - 16 - 20 - 25 - 31.5 - 40 - 50 - 63 - 80 - 100 - 125 - 160 - 200 - 250 - 315 - 400 - 500 - 630 - 800 - 1000 - 1250 - 1600 - 2000 - 2500 - 3150 - 4000 - 5000 - 6300 - 8000 - 10000 - 12500 - 16000 - 20000 Hz)</span>
-  </div>
   <div class=freq-input-row>
     <span class=field-label>Min. Frequency [Hz]</span>
     <input type=number id=minFreq value=31.5 step=0.1>
@@ -218,27 +219,48 @@ button:hover{background:#138496}
   <div class=section-title>Mic calibration settings</div>
   <div class=calib-grid>
     <span class=calib-label>+/-</span>
+            <div class=calib-col>
+                <input type=text id=cal31_5 placeholder="">
+                <span>31.5Hz</span>
+            </div>
     <div class=calib-col>
       <input type=text id=cal63 placeholder="">
       <span>63Hz</span>
     </div>
+            <div class=calib-col>
+                <input type=text id=cal125 placeholder="">
+                <span>125Hz</span>
+            </div>
     <div class=calib-col>
       <input type=text id=cal250 placeholder="">
       <span>250Hz</span>
     </div>
+            <div class=calib-col>
+                <input type=text id=cal500 placeholder="">
+                <span>500Hz</span>
+            </div>
     <div class=calib-col>
       <input type=text id=cal1000 placeholder="">
       <span>1000Hz</span>
     </div>
+            <div class=calib-col>
+                <input type=text id=cal2000 placeholder="">
+                <span>2000Hz</span>
+            </div>
     <div class=calib-col>
       <input type=text id=cal4000 placeholder="">
       <span>4000Hz</span>
     </div>
+            <div class=calib-col>
+                <input type=text id=cal8000 placeholder="">
+                <span>8000Hz</span>
+            </div>
     <div class=calib-col>
       <input type=text id=cal16000 placeholder="">
       <span>16000Hz</span>
     </div>
   </div>
+        <div style="font-size:13px;margin-top:6px;color:#333">1-octave calibration will automatically interpolate to 1/3-octave</div>
 </div>
 
 <button onclick="saveConfig()">Save Configuration</button>
@@ -300,10 +322,15 @@ fetch('api/config').then(r=>r.json()).then(data=>{
   document.getElementById('preBuffer').value=data.preBuffer||10;
   document.getElementById('recLength').value=data.recLength||'';
   
+    document.getElementById('cal31_5').value=data.calibration?.cal31_5||'';
   document.getElementById('cal63').value=data.calibration?.cal63||'';
+    document.getElementById('cal125').value=data.calibration?.cal125||'';
   document.getElementById('cal250').value=data.calibration?.cal250||'';
+    document.getElementById('cal500').value=data.calibration?.cal500||'';
   document.getElementById('cal1000').value=data.calibration?.cal1000||'';
+    document.getElementById('cal2000').value=data.calibration?.cal2000||'';
   document.getElementById('cal4000').value=data.calibration?.cal4000||'';
+    document.getElementById('cal8000').value=data.calibration?.cal8000||'';
   document.getElementById('cal16000').value=data.calibration?.cal16000||'';
   
   // Add event listeners for band and frequency range changes
@@ -331,13 +358,18 @@ function saveConfig(){
     storageLocation:document.getElementById('storageLocation').value,
     preBuffer:parseInt(document.getElementById('preBuffer').value)||10,
     recLength:parseInt(document.getElementById('recLength').value)||0,
-    calibration:{
-      cal63:document.getElementById('cal63').value,
-      cal250:document.getElementById('cal250').value,
-      cal1000:document.getElementById('cal1000').value,
-      cal4000:document.getElementById('cal4000').value,
-      cal16000:document.getElementById('cal16000').value
-    }
+        calibration:{
+            cal31_5:document.getElementById('cal31_5').value,
+            cal63:document.getElementById('cal63').value,
+            cal125:document.getElementById('cal125').value,
+            cal250:document.getElementById('cal250').value,
+            cal500:document.getElementById('cal500').value,
+            cal1000:document.getElementById('cal1000').value,
+            cal2000:document.getElementById('cal2000').value,
+            cal4000:document.getElementById('cal4000').value,
+            cal8000:document.getElementById('cal8000').value,
+            cal16000:document.getElementById('cal16000').value
+        }
   };
   
   fetch('api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(config)})
@@ -609,7 +641,7 @@ def main():
         "storageLocation": "/media/wp_audio/events",
         "preBuffer": 10,
         "recLength": 30,
-        "calibration": {"cal63": 0, "cal250": 0, "cal1000": 0, "cal4000": 0, "cal16000": 0}
+        "calibration": {"cal31_5": 0, "cal63": 0, "cal125": 0, "cal250": 0, "cal500": 0, "cal1000": 0, "cal2000": 0, "cal4000": 0, "cal8000": 0, "cal16000": 0}
     }
     
     # Load from persistent file if exists
@@ -760,12 +792,15 @@ def main():
         # Apply calibration offsets from UI config
         for freq_key, offset_str in calibration.items():
             try:
-                freq = int(freq_key.replace("cal", ""))
+                # Support decimal keys like cal31_5 -> 31.5
+                key = freq_key.replace("cal", "").replace("_", ".")
+                freq = float(key)
                 offset = float(offset_str) if offset_str else 0.0
                 if offset != 0.0:
                     band_corr[freq] = band_corr.get(freq, 0.0) + offset
                     print(f"[wp-audio] Calibration: {freq} Hz += {offset:.2f} dB", flush=True)
-            except: pass
+            except Exception as e:
+                print(f"[wp-audio] WARNING: invalid calibration entry {freq_key}={offset_str}: {e}", flush=True)
     
     def spl_db(rms): return 20.0*np.log10(max(rms,1e-20)/20e-6)+cal_off
 
@@ -779,6 +814,35 @@ def main():
         return sos_low, sos_full
     sos_low, sos_full = build_filters(fs_target)
     a_low    = {fc: a_corr(fc) for fc in FCS_LOW}
+
+    # Build interpolated calibration corrections for current target bands
+    def build_interpolated_corr(bcorr: dict, targets: list) -> dict:
+        if not bcorr:
+            return {fc: 0.0 for fc in targets}
+        # Sort calibration points by frequency
+        cps = sorted(((float(f), float(v)) for f, v in bcorr.items()), key=lambda x: x[0])
+        freqs = [f for f, _ in cps]
+        logs  = [math.log10(f) for f in freqs]
+        vals  = [v for _, v in cps]
+        def interp(fc: float) -> float:
+            lf = math.log10(fc)
+            if lf <= logs[0]:
+                return vals[0]
+            if lf >= logs[-1]:
+                return vals[-1]
+            # Find interval
+            for i in range(1, len(logs)):
+                if lf <= logs[i]:
+                    w = (lf - logs[i-1]) / (logs[i] - logs[i-1])
+                    return vals[i-1] * (1.0 - w) + vals[i] * w
+            return 0.0
+        result = {}
+        for fc in targets:
+            result[fc] = bcorr.get(fc, interp(fc))
+        return result
+
+    corr_low  = build_interpolated_corr(band_corr, FCS_LOW)
+    corr_full = build_interpolated_corr(band_corr, FCS_FULL)
 
     pre_buf=deque(maxlen=max(1,int(args.pre/block_sec)))
     spec_buf=deque(maxlen=max(1,int(args.pre/block_sec)))  # Ring buffer for spectrum data
@@ -940,7 +1004,7 @@ def main():
             LZ={}; LA={}
             for fc,sos in sos_low.items():
                 y=sosfilt(sos,x)
-                lz=spl_db(np.sqrt(np.mean(y*y)))+band_corr.get(fc,0.0)
+                lz=spl_db(np.sqrt(np.mean(y*y)))+corr_low.get(fc,0.0)
                 la=lz+a_low[fc]
                 LZ[fc]=lz; LA[fc]=la
 
@@ -962,7 +1026,7 @@ def main():
                 vals=[]
                 for fc,sos in sos_full.items():
                     y=sosfilt(sos,x)
-                    lz=spl_db(np.sqrt(np.mean(y*y)))+band_corr.get(fc,0.0)
+                    lz=spl_db(np.sqrt(np.mean(y*y)))+corr_full.get(fc,0.0)
                     if args.spectrum_weighting=="A":
                         v = lz + a_corr(fc)
                     elif args.spectrum_weighting=="C":
